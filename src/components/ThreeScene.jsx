@@ -15,6 +15,10 @@ const ThreeScene = () => {
   const clockRef = useRef(new THREE.Clock());
   const animationFrameIdRef = useRef();
 
+  // --- Constants --- //
+  const FADE_DURATION = 0.3; // Re-added for crossfading
+  const CAMERA_Y_OFFSET = -1; // <<< Added vertical offset for the camera
+
   useEffect(() => {
     const currentMount = mountRef.current;
     if (!currentMount) return;
@@ -68,18 +72,34 @@ const ThreeScene = () => {
         let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
 
         // Add a slight buffer/padding
-        cameraZ *= 1.5; // Adjust multiplier for more/less padding
+        cameraZ *= 1.55; // Adjust multiplier for more/less padding
 
-        // Position camera looking at the center
-        camera.position.set(center.x, center.y, center.z + cameraZ);
-        camera.lookAt(center);
-        console.log("Camera adjusted to fit model:", {
-          center,
-          size,
-          cameraPosition: camera.position,
-        });
+        // Position camera looking at the center, offset along X, and add Y offset
+        camera.position.set(
+          center.x + cameraZ,
+          center.y + CAMERA_Y_OFFSET,
+          center.z
+        );
+        // Make the camera look at a point also offset by CAMERA_Y_OFFSET on the Y axis
+        const lookAtTarget = new THREE.Vector3(
+          center.x,
+          center.y + CAMERA_Y_OFFSET,
+          center.z
+        );
+        camera.lookAt(lookAtTarget);
+        console.log(
+          "Camera adjusted to fit model (X/Y offset, adjusted lookAt):",
+          {
+            center,
+            lookAtTarget, // Log the new target
+            size,
+            cameraPosition: camera.position,
+            offsetY: CAMERA_Y_OFFSET,
+          }
+        );
         // --- END: Adjust Camera --- //
 
+        // Setup Animations (ensure clampWhenFinished = true)
         if (gltf.animations && gltf.animations.length > 0) {
           console.log("Animations found:", gltf.animations);
           mixerRef.current = new THREE.AnimationMixer(modelRef.current);
@@ -97,8 +117,7 @@ const ThreeScene = () => {
             openingActionRef.current = mixerRef.current.clipAction(openingClip);
             console.log(`Opening action created: ${openingClip.name}`);
             openingActionRef.current.loop = THREE.LoopOnce;
-            // Optional: Play opening animation once on load?
-            // openingActionRef.current.play();
+            openingActionRef.current.clampWhenFinished = true;
           } else {
             console.warn("Could not find animation named 'opening'!");
           }
@@ -107,6 +126,7 @@ const ThreeScene = () => {
             closingActionRef.current = mixerRef.current.clipAction(closingClip);
             console.log(`Closing action created: ${closingClip.name}`);
             closingActionRef.current.loop = THREE.LoopOnce;
+            closingActionRef.current.clampWhenFinished = true;
           } else {
             console.warn("Could not find animation named 'closing'!");
           }
@@ -121,6 +141,37 @@ const ThreeScene = () => {
         console.error("Error loading GLTF model:", error);
       }
     );
+
+    // --- 4. Interaction (mouseenter/mouseleave on DIV with Crossfade) --- //
+    const handleMouseEnter = () => {
+      console.log("Div Mouse Enter - Fade to Opening");
+      const openingAction = openingActionRef.current;
+      const closingAction = closingActionRef.current;
+
+      if (openingAction) {
+        openingAction.reset();
+        openingAction.setEffectiveWeight(1);
+        openingAction.fadeIn(FADE_DURATION).play();
+      }
+      if (closingAction) {
+        closingAction.fadeOut(FADE_DURATION);
+      }
+    };
+
+    const handleMouseLeave = () => {
+      console.log("Div Mouse Leave - Fade to Closing");
+      const openingAction = openingActionRef.current;
+      const closingAction = closingActionRef.current;
+
+      if (closingAction) {
+        closingAction.reset();
+        closingAction.setEffectiveWeight(1);
+        closingAction.fadeIn(FADE_DURATION).play();
+      }
+      if (openingAction) {
+        openingAction.fadeOut(FADE_DURATION);
+      }
+    };
 
     // --- 5. Animation Loop --- //
     const animate = () => {
@@ -153,6 +204,9 @@ const ThreeScene = () => {
     // --- 7. Initial Setup & Event Listeners --- //
     currentMount.appendChild(renderer.domElement);
     const canvasElement = renderer.domElement;
+    // Add mouseenter/mouseleave listeners to the container div
+    currentMount.addEventListener("mouseenter", handleMouseEnter);
+    currentMount.addEventListener("mouseleave", handleMouseLeave);
     window.addEventListener("resize", handleResize);
     animate(); // Start the animation loop (mixer will update, but no actions playing by default)
 
@@ -165,7 +219,14 @@ const ThreeScene = () => {
         console.log("Cleanup: Animation frame cancelled");
       }
 
+      // Remove listeners
       window.removeEventListener("resize", handleResize);
+      if (currentMount) {
+        // Ensure mount point still exists for cleanup
+        currentMount.removeEventListener("mouseenter", handleMouseEnter);
+        currentMount.removeEventListener("mouseleave", handleMouseLeave);
+        console.log("Cleanup: Mouse listeners removed from div");
+      }
 
       if (modelRef.current) {
         if (scene) scene.remove(modelRef.current);
