@@ -1,0 +1,7 @@
+.container {
+  width: 300px;
+  height: 400px; /* Use vh for viewport height */
+  display: block; /* Ensures the div takes up block space */
+  background-color: transparent; /* Ensure the div itself is transparent */
+  border: 1px solid red;
+}
