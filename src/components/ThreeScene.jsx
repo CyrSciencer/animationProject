@@ -3,7 +3,13 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import styles from "./ThreeScene.module.css"; // Import the CSS module
 
-const ThreeScene = () => {
+// Accept modelColor prop with a default value (e.g., white)
+const ThreeScene = ({
+  modelColor = "#ffffff",
+  onPressing = () => {
+    console.log("Button pressed");
+  },
+}) => {
   // --- Refs --- //
   const mountRef = useRef(null);
   const modelRef = useRef();
@@ -16,7 +22,7 @@ const ThreeScene = () => {
   const animationFrameIdRef = useRef();
 
   // --- Constants --- //
-  const FADE_DURATION = 0.3; // Re-added for crossfading
+  const FADE_DURATION = 0.3;
   const CAMERA_Y_OFFSET = -1; // <<< Added vertical offset for the camera
 
   useEffect(() => {
@@ -46,10 +52,11 @@ const ThreeScene = () => {
     rendererRef.current = renderer;
 
     // --- 2. Lighting Setup --- //
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    // Reverted to original light setup
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(5, 10, 7.5);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1); // Reverted to default white
+    directionalLight.position.set(20, -5, 0);
     scene.add(directionalLight);
 
     // --- 3. Model & Animation Loading --- //
@@ -59,7 +66,32 @@ const ThreeScene = () => {
       (gltf) => {
         console.log("GLTF loaded successfully:", gltf);
         modelRef.current = gltf.scene;
-        scene.add(modelRef.current);
+
+        // --- Apply Initial Custom Color --- (Reverted from Toon Material)
+        if (modelRef.current) {
+          console.log(`Applying initial color: ${modelColor}`);
+          modelRef.current.traverse((object) => {
+            if (object.isMesh && object.material) {
+              // Handle both single material and array of materials
+              if (Array.isArray(object.material)) {
+                object.material.forEach((material) => {
+                  if (material.color) {
+                    // Check if material has color property
+                    material.color.set(modelColor);
+                  }
+                });
+              } else {
+                if (object.material.color) {
+                  // Check if material has color property
+                  object.material.color.set(modelColor);
+                }
+              }
+            }
+          });
+        }
+        // --- END: Apply Initial Custom Color ---
+
+        scene.add(modelRef.current); // Add model AFTER applying material
 
         // --- ADDED: Adjust Camera to Fit Model --- //
         const box = new THREE.Box3().setFromObject(modelRef.current);
@@ -253,6 +285,7 @@ const ThreeScene = () => {
       openingActionRef.current = null;
       closingActionRef.current = null;
 
+      // --- Reverted Light Cleanup ---
       if (ambientLight) ambientLight.dispose();
       if (directionalLight) directionalLight.dispose();
       console.log("Cleanup: Lights disposed");
@@ -276,9 +309,36 @@ const ThreeScene = () => {
 
       console.log("Cleanup: Complete");
     };
-  }, []);
+  }, []); // Reverted to empty dependency array for setup/cleanup effect
 
-  return <div ref={mountRef} className={styles.container} />;
+  // --- Effect to Update Color on Prop Change --- (Reverted from Toon updates)
+  useEffect(() => {
+    // Only run if the model is loaded and color prop changes
+    if (modelRef.current && modelColor) {
+      console.log(`Updating model color to: ${modelColor}`);
+      modelRef.current.traverse((object) => {
+        if (object.isMesh && object.material) {
+          // Handle both single material and array of materials
+          if (Array.isArray(object.material)) {
+            object.material.forEach((material) => {
+              if (material.color) {
+                material.color.set(modelColor);
+              }
+            });
+          } else {
+            if (object.material.color) {
+              object.material.color.set(modelColor);
+            }
+          }
+        }
+      });
+    }
+  }, [modelColor]); // Depend only on modelColor
+  // --- END: Effect to Update Color ---
+
+  return (
+    <div ref={mountRef} className={styles.container} onClick={onPressing} />
+  );
 };
 
 export default ThreeScene;

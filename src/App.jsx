@@ -6,7 +6,10 @@ function App() {
   return (
     <div className="App">
       {/* You could add other React components here if needed */}
-      <ThreeScene />
+      <ThreeScene modelColor="#000000" />
+      <ThreeScene modelColor="#4f284b" />
+      <ThreeScene modelColor="#3f3f3f" />
+      <ThreeScene modelColor="#000fff" />
     </div>
   );
 }
